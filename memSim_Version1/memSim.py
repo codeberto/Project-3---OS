@@ -73,15 +73,14 @@ def ProcessArgs(arguments, frames, pra):
          
 #getValue
 #return the value from the specified address with the specified offset
-def getValue(virt, binF):
-  truOff = (virt.page * PAGE_TABLE_ENTRIES) + virt.offset
-  binF.seek(truOff)
-  val = binF.read(1)
+def GetValue(binFile, virtual)
+  truOff = (virtual.page * PAGE_TABLE_ENTRIES) + virtual.offset
+  binFile.seek(truOff)
+  val = binFile.read(1)
   intVal = ord(val)
   if intVal > ((PAGE_TABLE_ENTRIES /2) + 1):
      intVal = intVal - 256
-  print "Value at offset: %d" % (intVal)
-  return val         
+  return intVal         
 
 # Prints all the data we need to print to stdout
 def PrintData(pageTable): 
@@ -121,6 +120,7 @@ def main():
          print 'Address: %d' %virtual.address
          print virtual.page
          print virtual.offset
+         print "Value at offset: %d" % (GetValue(binFile, virtual)
          line = textFile.readline()
          try:
             virtual = VirtualInfo(int(line))
