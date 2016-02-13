@@ -44,10 +44,10 @@ class Page:
 class PageTable:
    def __init__(self):
       self.table = [None] * PAGE_TABLE_ENTRIES 
-      self.entries = 0
+      self.faults = 0
    def add(self, pageNum):
       self.table[pageNum] = Page()
-      self.entries += 1
+      self.faults += 1
    def __len__(self):
       return self.entries
 
@@ -100,14 +100,20 @@ def ProcessArgs(arguments, frames, pra):
          pra.set(arguments[1])
 
 #return the value from the specified address with the specified offset
-def GetValue(binFile, virtual):
-   truOff = (virtual.page * PAGE_TABLE_ENTRIES) + virtual.offset
-   binFile.seek(truOff)
-   val = binFile.read(1)
-   intVal = ord(val)
-   if intVal > ((PAGE_TABLE_ENTRIES /2) + 1):
-      intVal = intVal - 256
-   return intVal  
+def GetValue(content, virtual):
+  # truOff = (virtual.page * PAGE_TABLE_ENTRIES) + virtual.offset
+  # binFile.seek(truOff)
+  # cont = content
+  # cont.seek(virtual.offset)
+  # val = cont.read(1)
+  print 'offset = %d' %virtual.offset
+  print ord(content[virtual.offset])
+  
+ #  val = content[virtual.offset / 8]
+ #  intVal = ord(val)  
+ #  if intVal > ((PAGE_TABLE_ENTRIES /2) + 1):
+ #     intVal = intVal - 256
+#   return intVal  
     
 # Gets the 256 bytes from the frame and converts it to hex
 def GetContent(binFile, virtual):
@@ -119,10 +125,12 @@ def GetContent(binFile, virtual):
    return content
 
 # Prints all the data we need to print to stdout
-def PrintData(pageTable): 
-   print('Number of Translated Addresses = %d' %(len(pageTable))) 
-   print('Page Faults = %d' %(0))
-   print('Page Fault Rate = %.3f' %(3.1456))
+def PrintData(pageTable, leng): 
+   faults = pageTable.faults
+
+   print('Number of Translated Addresses = %d' %leng) 
+   print('Page Faults = %d' %faults)
+   print('Page Fault Rate = %.3f' %(faults / leng))
    print('TLB Hits = %d' %(111))
    print('TLB Misses = %d' %(111))
    print('TLB Miss Rate = %.3f' %(3.1456))
@@ -132,6 +140,9 @@ def main():
    arguments = sys.argv[1:]
    buffer = TLB()
    pageTable = PageTable()
+
+   pageCounter = 0
+   frameCounter = 0
 
    if len(arguments) > 0:
       filename = arguments[0]
@@ -150,8 +161,17 @@ def main():
          virtual.getInfo()
  
       while line:
+         pageTable.add(virtual.page)
+         pageCounter += 1
+         physicalMem.set(frameCounter, GetContent(binFile, virtual))
+         frameCounter += 1
+
          print 'Address: %d' %virtual.address
-         print GetContent(binFile, virtual)
+       #  print GetValue(binFile, virtual)
+       #  print GetContent(binFile, virtual)
+         GetValue(physicalMem.get(frameCounter - 1), virtual)     
+   #      print GetValue(physicalMem.get(frameCounter - 1), virtual)
+  #       print physicalMem.get(frameCounter - 1)
 
          line = textFile.readline()
 
@@ -161,7 +181,7 @@ def main():
          except ValueError:
             virtual = 0
       
-      PrintData(pageTable)
+      PrintData(pageTable, pageCounter)
 
 # Runs the main method      
 if __name__ == "__main__":
