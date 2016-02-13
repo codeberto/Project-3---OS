@@ -70,6 +70,18 @@ def ProcessArgs(arguments, frames, pra):
          frames.set(arguments[1])
       else:
          pra.set(arguments[1])
+         
+#getValue
+#return the value from the specified address with the specified offset
+def getValue(virt, binF):
+  truOff = (virt.page * PAGE_TABLE_ENTRIES) + virt.offset
+  binF.seek(truOff)
+  val = binF.read(1)
+  intVal = ord(val)
+  if intVal > ((PAGE_TABLE_ENTRIES /2) + 1):
+     intVal = intVal - 256
+  print "Value at offset: %d" % (intVal)
+  return val         
 
 # Prints all the data we need to print to stdout
 def PrintData(pageTable): 
