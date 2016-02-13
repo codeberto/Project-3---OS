@@ -34,29 +34,35 @@ class Page:
       self.loaded = False
    def set(self, frame):
       self.frame = frame
+      self.loaded = true
    def get(self):
       return frame
-   def load(self):
-      self.loaded = True
    def unLoad(self):
-      return self.loaded
+      self.loaded = False
 
 # We want to make an array of PageEnties
 class PageTable:
    def __init__(self):
       self.table = [None] * PAGE_TABLE_ENTRIES 
       self.entries = 0
-   def add(self, pageNum, page):
-      self.table[pageNum] = page
+   def add(self, pageNum):
+      self.table[pageNum] = Page()
       self.entries += 1
    def __len__(self):
       return self.entries
 
-#class PhysicalMem:
-#   def __init__(self, frames):
-#      self.table = [None] * frames
-#   def set(self, index, content):
-#      self.table[index] = content
+# an array of page data in physical memory
+class PhysicalMem:
+   def __init__(self, frames):
+      self.table = [None] * frames
+     # self.maxFrames = frames
+      self.frameCount = 0
+   def set(self, index, content):
+     # if self.frameCount == self.maxFrames
+      self.table[index] = content
+      self.frameCount += 1;
+   def get(self, index):
+      return self.table[index]
 
 # How to order the frames and indexes of logical and physical memory
 class VirtualInfo:
@@ -133,7 +139,7 @@ def main():
       pra = Ref(DEFAULT_TLB)
       
       ProcessArgs(arguments, frames, pra)
- #     physicalMem = PhysicalMem(frames)
+      physicalMem = PhysicalMem(frames.get())
 
       binFile = open(BIN)
       textFile = open(filename)
