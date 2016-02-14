@@ -101,19 +101,11 @@ def ProcessArgs(arguments, frames, pra):
 
 #return the value from the specified address with the specified offset
 def GetValue(content, virtual):
-  # truOff = (virtual.page * PAGE_TABLE_ENTRIES) + virtual.offset
-  # binFile.seek(truOff)
-  # cont = content
-  # cont.seek(virtual.offset)
-  # val = cont.read(1)
-  print 'offset = %d' %virtual.offset
-  print ord(content[virtual.offset])
-  
- #  val = content[virtual.offset / 8]
- #  intVal = ord(val)  
- #  if intVal > ((PAGE_TABLE_ENTRIES /2) + 1):
- #     intVal = intVal - 256
-#   return intVal  
+  cont = content.decode('hex')
+  val = ord(cont[virtual.offset])
+  if val > ((PAGE_TABLE_ENTRIES /2) + 1):
+    val = val - 256
+  return val
     
 # Gets the 256 bytes from the frame and converts it to hex
 def GetContent(binFile, virtual):
@@ -162,17 +154,14 @@ def main():
  
       while line:
          pageTable.add(virtual.page)
-         pageCounter += 1
          physicalMem.set(frameCounter, GetContent(binFile, virtual))
+
+         print 'Address: %d' %virtual.address   
+         print GetValue(physicalMem.get(frameCounter), virtual)
+         print physicalMem.get(frameCounter)
+  
+         pageCounter += 1
          frameCounter += 1
-
-         print 'Address: %d' %virtual.address
-       #  print GetValue(binFile, virtual)
-       #  print GetContent(binFile, virtual)
-         GetValue(physicalMem.get(frameCounter - 1), virtual)     
-   #      print GetValue(physicalMem.get(frameCounter - 1), virtual)
-  #       print physicalMem.get(frameCounter - 1)
-
          line = textFile.readline()
 
          try:
