@@ -11,6 +11,9 @@ DEFAULT_TLB = 'fifo'
 BIN = 'BACKING_STORE.bin'
 MASK = 255
 BYTE = 8
+FIFO = 0
+IRU = 1
+OPT = 2
 
 # Define all classes here
 
@@ -40,11 +43,11 @@ class TLB:
       elif self.type == IRU:
          print 'got in IRU'
       else:
-         self.table[index] = Page()
+         self.table[self.index] = Page()
 
          if self.index == TLB_ENTRIES - 1:
             self.index = 0
-         else
+         else:
             self.index += 1
 
 class Page:
@@ -53,7 +56,7 @@ class Page:
       self.loaded = False
    def set(self, frame):
       self.frame = frame
-      self.loaded = true
+      self.loaded = True
    def get(self):
       return frame
    def unLoad(self):
@@ -69,6 +72,8 @@ class PageTable:
       self.faults += 1
    def __len__(self):
       return self.entries
+   def set(self, pageNum, frameNum):
+      self.table[pageNum].set(frameNum)
 
 # an array of page data in physical memory
 class PhysicalMem:
@@ -136,20 +141,19 @@ def GetContent(binFile, virtual):
    return content
 
 # Prints all the data we need to print to stdout
-def PrintData(pageTable, leng): 
+def PrintData(pageTable, tlb, leng): 
    faults = pageTable.faults
 
    print('Number of Translated Addresses = %d' %leng) 
    print('Page Faults = %d' %faults)
    print('Page Fault Rate = %.3f' %(faults / leng))
-   print('TLB Hits = %d' %(111))
-   print('TLB Misses = %d' %(111))
-   print('TLB Miss Rate = %.3f' %(3.1456))
+   print('TLB Hits = %d' %(tlb.hits))
+   print('TLB Misses = %d' %(tlb.miss))
+   print('TLB Miss Rate = %.3f' %(tlb.miss / (tlb.hits + tlb.miss)))
 
 # Main method 
 def main():
    arguments = sys.argv[1:]
-   buffer = TLB()
    pageTable = PageTable()
 
    pageCounter = 0
@@ -162,6 +166,7 @@ def main():
       
       ProcessArgs(arguments, frames, pra)
       physicalMem = PhysicalMem(frames.get())
+      tlb = TLB(FIFO)
 
       binFile = open(BIN)
       textFile = open(filename)
@@ -172,8 +177,27 @@ def main():
          virtual.getInfo()
  
       while line:
+         # check here if page is in TLB
+         # if so
+            # grab frame number and go straight to physicalMem to get data
+            # DO NOT increment page or frame Counter
+         # if not in TLB
+            # check if page is in pageTable
+                # if yes 
+                   # add page to TLB
+                   # grab frame number and go to physicalMem to get data
+                   # DO NOT increment
+                # if not in pageTable
+                   # add new page to pageTable
+                   # add and set new frame in physicalMem
+                   # set frame val in page in pageTable
+                   # add page to TLB
+                   # only time you increment
+         tlb.add(virtual.page)
          pageTable.add(virtual.page)
          physicalMem.set(frameCounter, GetContent(binFile, virtual))
+         pageTable.set(virtual.page, frameCounter)
+
 
          print 'Address: %d' %virtual.address   
          print GetValue(physicalMem.get(frameCounter), virtual)
@@ -189,7 +213,7 @@ def main():
          except ValueError:
             virtual = 0
       
-      PrintData(pageTable, pageCounter)
+      PrintData(pageTable, tlb ,pageCounter)
 
 # Runs the main method      
 if __name__ == "__main__":
