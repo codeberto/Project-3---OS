@@ -17,16 +17,35 @@ BYTE = 8
 # Would like to implement a HashMap here in order to get keys
 # and their frame values
 class TLB:
-   def __init__(self):
-      self.dict = {}
+   def __init__(self, type):
+      self.table = [None] * TLB_ENTRIES
       self.hits = 0
       self.miss = 0
-      self.page = 0
+      self.type = type
       self.index = 0
-   def add(self, page):
-      newDict = {self.index: page}
-      self.dict.update(newDict)
-      self.index += 1
+   def check(self, pageNum):
+      status = False
+
+      for num in xrange(TLB_ENTRIES):
+         if self.table[num] == pageNum:
+            status = True
+            self.hits += 1
+
+      return status
+   def add(self, pageNum):
+      self.miss += 1
+
+      if self.type == OPT:
+         print 'got in OPT'
+      elif self.type == IRU:
+         print 'got in IRU'
+      else:
+         self.table[index] = Page()
+
+         if self.index == TLB_ENTRIES - 1:
+            self.index = 0
+         else
+            self.index += 1
 
 class Page:
    def __init__(self):
