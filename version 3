@@ -30,9 +30,10 @@ class TLB:
       status = False
 
       for num in xrange(TLB_ENTRIES):
-         if self.table[num] == pageNum:
-            status = True
-            self.hits += 1
+         if self.table[num] is not None:
+            if self.table[num].getN() == pageNum:
+              status = True
+              self.hits += 1
 
       return status
    def add(self, pageTemp):
@@ -52,8 +53,9 @@ class TLB:
    def getf(self, pageNum):
      frame = -1
      for num in xrange(TLB_ENTRIES):
-        if self.table[num].getN() == pageNum:
-           frame = self.table[num].getF()
+        if self.table[num] is not None:
+          if self.table[num].getN() == pageNum:
+              frame = self.table[num].getF()
      return frame
 
 # a basic page class
@@ -85,11 +87,8 @@ class PageTable:
       return self.entries
    def check(self, pageNum):
       status = False
-
-      for num in xrange(PAGE_TABLE_ENTRIES):
-         if self.table[num] == pageNum:
-            status = True
- 
+      if self.table[pageNum] is not None:
+        status = True
       return status
    def getP(self, pageNum):
       self.table[pageNum]
@@ -165,10 +164,10 @@ def PrintData(pageTable, tlb, leng):
 
    print('Number of Translated Addresses = %d' %leng) 
    print('Page Faults = %d' %faults)
-   print('Page Fault Rate = %.3f' %(faults / leng))
+   print('Page Fault Rate = %.3f' %(float(faults) / float(leng)))
    print('TLB Hits = %d' %(tlb.hits))
    print('TLB Misses = %d' %(tlb.miss))
-   print('TLB Miss Rate = %.3f' %(tlb.miss / (tlb.hits + tlb.miss)))
+   print('TLB Miss Rate = %.3f' %(float(tlb.miss) / (float(tlb.hits) + float(tlb.miss))))
 
 # Main method 
 def main():
@@ -208,7 +207,7 @@ def main():
           if pageTable.check(virtual.page):
               # if yes 
               # add page to TLB
-            pageTemp = pageTable.get(virtual.page)
+            pageTemp = pageTable.getP(virtual.page)
             tlb.add(pageTemp)
               # grab frame number and go to physicalMem to get data
               # DO NOT increment
@@ -226,9 +225,9 @@ def main():
             pageTable.add(pageTemp)
             tlb.add(pageTemp)
 
-            pageCounter += 1
             frameCounter += 1
 
+        pageCounter += 1
         frameNum = tlb.getf(virtual.page)
         print 'Address: %d' %virtual.address   
         print GetValue(physicalMem.get(frameNum), virtual)
