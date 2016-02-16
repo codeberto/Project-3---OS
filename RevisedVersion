@@ -31,7 +31,7 @@ class Page:
       self.loaded = True
    def unLoad(self):
       self.loaded = False
-      
+
 # This is the translation lookaside buffer and will hold only 16 spots
 # for incomming pages
 class TLB:
@@ -215,20 +215,24 @@ def main():
       pageID, offset = GetInfo(address)
       newPage = Page()
       newPage.id = pageID
-      newPage.frame = physicalMem.nextFrame
+      frameNum = physicalMem.nextFrame
 
       if not(buffer.lookup(pageID)):
          if pageTable.lookup(pageID):
             pageTemp = pageTable.getPage(pageID)
             buffer.add(pageTemp)
+            frameNum = pageTemp.frame
          else:
+            newPage.setFrame(physicalMem.nextFrame)
             buffer.add(newPage)
             pageTable.add(newPage)
             physicalMem.add(GetContent(binFile, pageID))
+      else:
+         frameNum = buffer.getFrame(pageID)
 
       stdout.write('%d, ' %address)
       stdout.write('%d, ' %GetValue(physicalMem.get(physicalMem.currentFrame), offset))
-      stdout.write('%d, ' %physicalMem.currentFrame)
+      stdout.write('%d, ' %frameNum)
       stdout.write(physicalMem.get(physicalMem.currentFrame))
       stdout.write('\n')
       stdout.flush()
@@ -241,5 +245,3 @@ if __name__ == "__main__":
    main()
 
 # End of Code
-
-
