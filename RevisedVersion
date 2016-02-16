@@ -94,9 +94,9 @@ class PageTable:
 
 class PhysicalMem:
    def __init__(self, sched, frames):
-      self.table = [0] * frames
+      self.table = [0] * int(frames)
       self.sched = sched
-      self.maxFrames = frames
+      self.maxFrames = int(frames)
       self.currentFrame = 0
       self.nextFrame = 0
 
