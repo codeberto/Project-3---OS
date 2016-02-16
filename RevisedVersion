@@ -2,6 +2,7 @@
 
 # Imported libraries
 import sys
+from sys import stdout
 
 # Constants for the virtual memory program
 FIFO = 0
@@ -10,10 +11,107 @@ OPT = 2
 MAX_TLB = 16
 MAX_PAGES = 256
 FRAMES = 256
+CONTENT_SIZE = 256
 DEFAULT_SCHED = 'FIFO'
 MASK = 255
 BYTE = 8
 BACKING_STORE = 'BACKING_STORE.bin'
+
+# The following will be classes that will be used in this code
+
+# This is a basic page class that will be used as the simple structure
+# that we can pass into other classes
+class Page:
+   def __init__(self):
+      self.id = -1
+      self.frame = -1
+      self.loaded = False
+   def setFrame(self, frame):
+      self.frame = frame
+      self.loaded = True
+   def unLoad(self):
+      self.loaded = False
+      
+# This is the translation lookaside buffer and will hold only 16 spots
+# for incomming pages
+class TLB:
+   def __init__(self, sched):
+      self.table = [Page()] * MAX_TLB
+      self.nextIndex = 0
+      self.hits = 0
+      self.misses = 0
+      self.sched = sched
+
+   def lookup(self, id):
+      status = False
+
+      for entry in self.table:
+         if entry.id == id:
+            status = True
+            self.hits += 1
+
+      return status
+
+   def add(self, page):
+      self.misses += 1
+
+      if self.sched == FIFO:
+         self.table[self.nextIndex] = page
+
+         if self.nextIndex == MAX_TLB - 1:
+            self.nextIndex = 0
+         else:
+            self.nextIndex += 1
+
+   def getFrame(self, id):
+      frame = -1
+
+      for entry in xrange(MAX_TLB):
+         if self.table[entry].id == id:
+            frame = self.table[entry].frame
+
+      return frame
+
+class PageTable:
+   def __init__(self):
+      self.table = [Page()] * MAX_PAGES
+      self.faults = 0
+
+   def add(self, page):
+      self.table[page.id] = page
+      self.faults += 1
+
+   def lookup(self, pageID):
+      status = False
+
+      if self.table[pageID].id is not -1:
+         status = True
+
+      return status
+
+   def getPage(self, pageID):
+      return self.table[pageID]
+
+class PhysicalMem:
+   def __init__(self, sched, frames):
+      self.table = [0] * frames
+      self.sched = sched
+      self.maxFrames = frames
+      self.currentFrame = 0
+      self.nextFrame = 0
+
+   def add(self, content):
+      if self.sched == FIFO:
+         self.table[self.nextFrame] = content
+         self.currentFrame = self.nextFrame
+
+         if self.nextFrame == self.maxFrames - 1:
+            self.nextFrame = 0
+         else:
+            self.nextFrame += 1
+
+   def get(self, index):
+      return self.table[index]
 
 # This function takes arguments in and returns them in a format we can use.
 # This assumes that all args are in the correct position
@@ -72,9 +170,33 @@ def GetInfo(address):
 
    return (page, offset)
 
+def GetValue(content, offset):
+   decoded = content.decode('hex')
+   value = ord(decoded[offset])
+
+   if value > ((CONTENT_SIZE / 2) + 1):
+      value = value - CONTENT_SIZE
+
+   return value
+
+def GetContent(binFile, page):
+   position = page * CONTENT_SIZE
+   file = binFile
+   file.seek(position)
+   content = file.read(256)
+   content = content.encode('hex').upper()
+   return content
+
 # Prints the data of the code to stdout
-def PrintData():
-   print 'end of code'
+def PrintData(pageTable, tlb, length):
+   faults = pageTable.faults
+
+   print('Number of Translated Addresses = %d' %length)
+   print('Page Faults = %d' %faults)
+   print('Page Fault Rate = %.3f' %(float(faults) / float(length)))
+   print('TLB Hits = %d' %(tlb.hits))
+   print('TLB Misses = %d' %(tlb.misses))
+   print('TLB Hit Rate = %.3f' %(float(tlb.hits) / (float(tlb.hits) + float(tlb.misses))))
 
 # Main function of the code. Will drive the functions in order to complete
 # the fake virtual memory code
@@ -85,18 +207,39 @@ def main():
    binFile = OpenFiles(logAddress, filename)
 
    sched = SetSched(pra)
-#   buffer = TLB(sched)
-#   pageTable = PageTable()
-#   physicalMem = PhysicalMem(sched, frames)
+   buffer = TLB(sched)
+   pageTable = PageTable()
+   physicalMem = PhysicalMem(sched, frames)
 
    for address in logAddress:
-      page, offset = GetInfo(address)
+      pageID, offset = GetInfo(address)
+      newPage = Page()
+      newPage.id = pageID
+      newPage.frame = physicalMem.nextFrame
+
+      if not(buffer.lookup(pageID)):
+         if pageTable.lookup(pageID):
+            pageTemp = pageTable.getPage(pageID)
+            buffer.add(pageTemp)
+         else:
+            buffer.add(newPage)
+            pageTable.add(newPage)
+            physicalMem.add(GetContent(binFile, pageID))
+
+      stdout.write('%d, ' %address)
+      stdout.write('%d, ' %GetValue(physicalMem.get(physicalMem.currentFrame), offset))
+      stdout.write('%d, ' %physicalMem.currentFrame)
+      stdout.write(physicalMem.get(physicalMem.currentFrame))
+      stdout.write('\n')
+      stdout.flush()
 
    binFile.close()
-   PrintData()
+   PrintData(pageTable, buffer, len(logAddress))
 
 # This makes sure that the main method will run
 if __name__ == "__main__":
    main()
 
 # End of Code
+
+
