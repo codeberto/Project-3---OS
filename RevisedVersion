@@ -174,7 +174,7 @@ def GetValue(content, offset):
    decoded = content.decode('hex')
    value = ord(decoded[offset])
 
-   if value > ((CONTENT_SIZE / 2) + 1):
+   if value > (CONTENT_SIZE / 2):
       value = value - CONTENT_SIZE
 
    return value
@@ -231,9 +231,9 @@ def main():
          frameNum = buffer.getFrame(pageID)
 
       stdout.write('%d, ' %address)
-      stdout.write('%d, ' %GetValue(physicalMem.get(physicalMem.currentFrame), offset))
+      stdout.write('%d, ' %GetValue(physicalMem.get(frameNum), offset))
       stdout.write('%d, ' %frameNum)
-      stdout.write(physicalMem.get(physicalMem.currentFrame))
+      stdout.write(physicalMem.get(frameNum))
       stdout.write('\n')
       stdout.flush()
 
