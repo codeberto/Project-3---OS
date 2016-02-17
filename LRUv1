@@ -4,260 +4,277 @@
 import sys
 from sys import stdout
 
-# Constants for the program
-TLB_ENTRIES = 16
-PAGE_TABLE_ENTRIES = 256
-DEFAULT_FRAMES = 256
-DEFAULT_TLB = 'fifo'
-BIN = 'BACKING_STORE.bin'
+# Constants for the virtual memory program
+FIFO = 0
+LRU = 1
+OPT = 2
+MAX_TLB = 16
+MAX_PAGES = 256
+FRAMES = 256
+CONTENT_SIZE = 256
+DEFAULT_SCHED = 'FIFO'
 MASK = 255
 BYTE = 8
-FIFO = 0
-IRU = 1
-OPT = 2
+BACKING_STORE = 'BACKING_STORE.bin'
 
-# Define all classes here
+# The following will be classes that will be used in this code
 
-# Would like to implement a HashMap here in order to get keys
-# and their frame values
-class TLB:
-   def __init__(self, type):
-      self.table = [None] * TLB_ENTRIES
-      self.hits = 0
-      self.miss = 0
-      self.type = type
-      self.index = 0
-   def check(self, pageNum):
-      status = False
-
-      for num in xrange(TLB_ENTRIES):
-         if self.table[num] is not None:
-            if self.table[num].getN() == pageNum:
-              status = True
-              self.hits += 1
-
-      return status
-   def add(self, pageTemp):
-      self.miss += 1
-
-      if self.type == OPT:
-         print 'got in OPT'
-      elif self.type == IRU:
-         print 'got in IRU'
-      else:
-         self.table[self.index] = pageTemp
-
-         if self.index == TLB_ENTRIES - 1:
-            self.index = 0
-         else:
-            self.index += 1
-   def getF(self, pageNum):
-     frame = -1
-     for num in xrange(TLB_ENTRIES):
-        if self.table[num] is not None:
-          if self.table[num].getN() == pageNum:
-              frame = self.table[num].getF()
-     return frame
-
-# a basic page class
+# This is a basic page class that will be used as the simple structure
+# that we can pass into other classes
 class Page:
    def __init__(self):
+      self.id = -1 
       self.frame = -1
-      self.name = -1
+      self.used = 0
       self.loaded = False
-   def set(self, pageNum, frame):
+   def setFrame(self, frame):
       self.frame = frame
-      self.name = pageNum
       self.loaded = True
-   def getF(self):
-      return self.frame
-   def getN(self):
-      return self.name
    def unLoad(self):
       self.loaded = False
 
-# We want to make an array of PageEnties
+# This is the translation lookaside buffer and will hold only 16 spots
+# for incomming pages
+class TLB:
+   def __init__(self, sched):
+      self.table = [Page()] * MAX_TLB
+      self.nextIndex = 0
+      self.hits = 0
+      self.misses = 0
+      self.sched = sched
+   
+   def lookup(self, id):
+      status = False
+      
+      for entry in self.table:
+         if entry.id == id:
+            status = True
+            self.hits += 1
+
+      return status
+   
+   def add(self, page):
+      self.misses += 1
+
+      if self.sched == FIFO:
+         self.table[self.nextIndex] = page
+         
+         if self.nextIndex == MAX_TLB - 1:
+            self.nextIndex = 0
+         else:
+            self.nextIndex += 1
+      
+   def getFrame(self, id):
+      frame = -1
+
+      for entry in xrange(MAX_TLB):
+         if self.table[entry].id == id:
+            frame = self.table[entry].frame
+
+      return frame
+
+   def updateFrame(self, frame):
+      for entry in self.table:
+         if entry.frame == frame:
+            entry.frame = -1
+            entry.unLoad()
+
+# All the pages are to be held in this data structure. Will not have
+# pages initialized in the beginning. They have to be added in
 class PageTable:
    def __init__(self):
-      self.table = [None] * PAGE_TABLE_ENTRIES 
+      self.table = [Page()] * MAX_PAGES
       self.faults = 0
-   def add(self, pageTemp):
-      self.table[pageTemp.getN()] = pageTemp
+
+   def add(self, page):
+      self.table[page.id] = page
       self.faults += 1
-   def __len__(self):
-      return self.entries
-   def check(self, pageNum):
+
+   def lookup(self, pageID):
       status = False
-      if self.table[pageNum] is not None:
-        status = True
+      
+      if self.table[pageID].id is not -1:
+         status = True
+
       return status
-   def getP(self, pageNum):
-      self.table[pageNum]
 
-# an array of page data in physical memory
+   def getPage(self, pageID):
+      return self.table[pageID]
+
+   def updateFrame(self, frame):
+      for entry in self.table:
+         if entry.frame == frame:
+            entry.frame = -1
+            entry.unLoad()
+
+# This will act as actual physical memory and have content or data in 
+# the frames to be accessed 
 class PhysicalMem:
-   def __init__(self, frames):
-      self.table = [None] * frames
-      self.maxFrames = frames
+   def __init__(self, sched, frames):
+      self.table = [0] * int(frames)
+      self.sched = sched
+      self.maxFrames = int(frames)
+      self.currentFrame = 0
       self.nextFrame = 0
-   def set(self, content):
-      # if self.frameCount == self.maxFrames
-      self.table[self.nextFrame] = content
 
-      if self.nextFrame == self.maxFrames:
-         self.nextFrame = 0
-      else:
-         self.nextFrame += 1
+   def add(self, content):
+      if self.sched == FIFO:
+         self.table[self.nextFrame] = content
+         self.currentFrame = self.nextFrame      
 
-   def getF(self):
-      #must do this one later
-      print 'hello to do this later'
+         if self.nextFrame == self.maxFrames - 1:
+            self.nextFrame = 0
+         else:
+            self.nextFrame += 1
+
    def get(self, index):
       return self.table[index]
+      
+# This function takes arguments in and returns them in a format we can use. 
+# This assumes that all args are in the correct position
+def ReturnArgs(args):
+   filename = ''
+   frames = FRAMES
+   pra = DEFAULT_SCHED
 
-# How to order the frames and indexes of logical and physical memory
-class VirtualInfo:
-   def __init__(self, address):
-      self.address = address
-      self.page = 0
-      self.offset = 0
-   def getInfo(self):
-      temp = self.address
-      page = self.page
-      page = MASK << BYTE
-      page = temp & page
-      self.page = page >> BYTE
-      self.offset = MASK & temp
+   if len(args) > 0:
+      filename = args[0]
 
-# This class is so we will be able to treat variables as pointers
-# This is a psudo pointer class
-class Ref:
-   def __init__(self, obj):
-      self.obj = obj
-   def get(self):
-      return self.obj
-   def set(self, obj): 
-      self.obj = obj
+      if len(args) == 3:
+         frames = args[1]
+         pra = args[2]
+      elif len(args) == 2:
+         if args[1].isdigit():
+            frames = args[1]
+         else:
+            pra = args[1]
 
-# All Functions will be here
-def ProcessArgs(arguments, frames, pra):
-   if len(arguments) == 3:
-      frames.set(arguments[1])
-      pra.set(arguments[2])
-   elif len(arguments) == 2:
-      if arguments[1].isdigit():
-         frames.set(arguments[1])
-      else:
-         pra.set(arguments[1])
+   return (filename, frames, pra)
 
-#return the value from the specified address with the specified offset
-def GetValue(content, virtual):
-   cont = content.decode('hex')
-   val = ord(cont[virtual.offset])
-   if val > ((PAGE_TABLE_ENTRIES /2) + 1):
-      val = val - 256
-   return val 
-    
-# Gets the 256 bytes from the frame and converts it to hex
-def GetContent(binFile, virtual):
-   traverse = virtual.page * PAGE_TABLE_ENTRIES  
-   bin = binFile
-   bin.seek(traverse)
-   content = binFile.read(256)
+# Opens the file passed in with a try except method. Takes all the data 
+# from that file and closes it. 
+# This also opens the backing store file
+def OpenFiles(logAddress, filename):
+   try:
+      with open(filename, 'r') as file:
+         for line in file:
+            logAddress.append(int(line))
+
+      file.close()
+   except IOError as e:
+      print 'I/O error, file does not exist'
+      sys.exit()
+
+   binFile = open(BACKING_STORE)
+
+   return binFile
+
+# Sets the scheduling type for physical memory and the tlb
+def SetSched(pra):
+   sched = FIFO
+
+   if pra.upper() == 'LRU':
+      sched = LRU
+   elif pra.upper() == 'OPT':
+      sched = OPT
+      
+   return sched
+
+# Gets the page info as well as the offset of an address
+def GetInfo(address):
+   page = (MASK << BYTE & address) >> BYTE
+   offset = MASK & address
+
+   return (page, offset)
+
+# Looks at a 256 byte hex value and gets the byte located at the offset
+# Prints in signed 8 bit integer
+def GetValue(content, offset):
+   decoded = content.decode('hex')  # Transformes a hex value to be readable as a decimal
+   value = ord(decoded[offset])  # Gets the byte from the specified offset
+   
+   # This makes sure that the output can be viewed as a 8 bit signed integer
+   if value >= (CONTENT_SIZE / 2):
+      value = value - CONTENT_SIZE
+   
+   return value
+
+# Gets a 256 byte value from the backing store 
+def GetContent(binFile, page):
+   position = page * CONTENT_SIZE
+   file = binFile
+   file.seek(position)
+   content = file.read(256)
    content = content.encode('hex').upper()
    return content
-
-# Prints all the data we need to print to stdout
-def PrintData(pageTable, tlb, leng): 
+ 
+# Prints the data of the code to stdout
+def PrintData(pageTable, tlb, length):
    faults = pageTable.faults
 
-   print('Number of Translated Addresses = %d' %leng) 
+   print('Number of Translated Addresses = %d' %length) 
    print('Page Faults = %d' %faults)
-   print('Page Fault Rate = %.3f' %(float(faults) / float(leng)))
+   print('Page Fault Rate = %.3f' %(float(faults) / float(length)))
    print('TLB Hits = %d' %(tlb.hits))
-   print('TLB Misses = %d' %(tlb.miss))
-   print('TLB Miss Rate = %.3f' %(float(tlb.miss) / (float(tlb.hits) + float(tlb.miss))))
+   print('TLB Misses = %d' %(tlb.misses))
+   print('TLB Hit Rate = %.3f' %(float(tlb.hits) / (float(tlb.hits) + float(tlb.misses))))
 
-# Main method 
+# Main function of the code. Will drive the functions in order to complete
+# the fake virtual memory code 
 def main():
-   arguments = sys.argv[1:]
-   tlb = TLB(FIFO)
-   pageTable = PageTable()
+   args = sys.argv[1:]  # This will have all the arguments that we will use
+   logAddress = []      # Will have all logical addresses
+   filename, frames, pra = ReturnArgs(args)  # Gives us all the arguments
+   binFile = OpenFiles(logAddress, filename) # Moves file contents to logAddress and opens backing store
 
-   pageCounter = 0
-   frameCounter = 0
+   sched = SetSched(pra)   # Sets the schedule. We will use for tlb and physical mem
+   buffer = TLB(sched)     # Sets up the TLB
+   pageTable = PageTable() # Sets up the page table
+   physicalMem = PhysicalMem(sched, frames)  # Sets up physical memory
+   
+   # Goes through all the logical addresses, Virtual Memory to Physical Memory part of the main
+   for address in logAddress:
+      pageID, offset = GetInfo(address)   # Gets the page and offset from the logical address
+      newPage = Page()  
+      newPage.id = pageID
+      frameNum = physicalMem.nextFrame    # Value will never get used. Put here to handle an error
 
-   if len(arguments) > 0:
-      filename = arguments[0]
-      frames = Ref(DEFAULT_FRAMES)
-      pra = Ref(DEFAULT_TLB)
-      
-      ProcessArgs(arguments, frames, pra)
-      physicalMem = PhysicalMem(frames.get())
+      # First checks to see if in the buffer to set frame
+      if not(buffer.lookup(pageID)):
+         # If not in the buffer checks to see if page is in the pageTable. Adds to buffer if yes
+         if pageTable.lookup(pageID):
+            pageTemp = pageTable.getPage(pageID)
+            buffer.add(pageTemp)
+         # Adds page to TLB and pagetable if not found. Then ands to pysical memory
+         else: 
+            newPage.setFrame(physicalMem.nextFrame)   # Based on the scheduling algorithm set new frame
+                                                      # Also makes the page turn on loaded bit
 
-      binFile = open(BIN)
-      textFile = open(filename)
+            pageTable.updateFrame(physicalMem.nextFrame)
+            buffer.updateFrame(physicalMem.nextFrame)
 
-      line = textFile.readline()
-      if (line):
-         virtual = VirtualInfo(int(line))
-         virtual.getInfo()
- 
-      while line:
-         # check here if page is in TLB
-          # if so
-            # grab frame number and go straight to physicalMem to get data
-            # DO NOT increment page or frame Counter
-          # if not in TLB
-         #else:
-         if not(tlb.check(virtual.page)):
-         # check if page is in pageTable
-            
-            if pageTable.check(virtual.page):
-              # if yes 
-              # add page to TLB
-               pageTemp = pageTable.getP(virtual.page)
-               tlb.add(pageTemp)
-               # grab frame number and go to physicalMem to get data
-               # DO NOT increment
-               # if not in pageTable
-            else:
-               # add and set new frame in physicalMem
-               # create a new page with number and frame
-               # set new page in pageTable
-               # add page to TLB
-               # grab frame number and go to physicalMem to get data
-               # only time you increment
-               physicalMem.set(GetContent(binFile, virtual))
-               pageTemp = Page()
-               pageTemp.set(virtual.page, frameCounter)
-               pageTable.add(pageTemp)
-               tlb.add(pageTemp)
+            buffer.add(newPage)
+            pageTable.add(newPage)
 
-               frameCounter += 1
+            physicalMem.add(GetContent(binFile, pageID))
+      else:
+         frameNum = buffer.getFrame(pageID)  # To access physical memory framenumber 
 
-         pageCounter += 1
-         frameNum = tlb.getF(virtual.page)
-         
-         stdout.write('%d, ' %virtual.address)
-         stdout.write('%d, ' %GetValue(physicalMem.get(frameNum), virtual))
-         stdout.write('%d, ' %(physicalMem.nextFrame - 1))
-         stdout.write(physicalMem.get(frameNum))
-         stdout.flush()
-         stdout.write('\n')
-         
-         line = textFile.readline()
+      frameNum = buffer.getFrame(pageID)  # Could be accessed through other means but this supports
+                                          # and mimics how virtual memory really moves around
+      # The following just prints out necessary information for each logical address
+      stdout.write('%d, ' %address)
+      stdout.write('%d, ' %GetValue(physicalMem.get(frameNum), offset))
+      stdout.write('%d, ' %frameNum)
+      stdout.write(physicalMem.get(frameNum))
+      stdout.write('\n')
+      stdout.flush()
 
-         try:
-            virtual = VirtualInfo(int(line))
-            virtual.getInfo()
-         except ValueError:
-            virtual = 0
-      
-      PrintData(pageTable, tlb ,pageCounter)
+   binFile.close()   # Now that we are not using the Backing Store we close the file
+   PrintData(pageTable, buffer, len(logAddress))   # Prints statistics 
 
-# Runs the main method      
+# This makes sure that the main method will run
 if __name__ == "__main__":
    main()
 
-# end of code
+# End of Code
