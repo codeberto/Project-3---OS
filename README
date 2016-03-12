@@ -1,7 +1,0 @@
-Rich Kaercher
-Ben Carter
-
-No special instruction
-
-When compiling the commandline will send an error that we caught if there is no file. 
-We also can take in a variable number of frames and can support LRU and FIFO
